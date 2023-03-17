@@ -1,6 +1,6 @@
-#Go with Azure
+# Go with Azure
 
-##An actual attempt at usable code to help with my actual job. Dream big.
+## An actual attempt at usable code to help with my actual job. Dream big.
 
 Golang repository to interact with Azure.
 
