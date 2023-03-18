@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"gowithazure/src/auth"
 	"gowithazure/src/utility"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -21,6 +22,9 @@ func main() {
 	}
 
 	fmt.Printf("Azure Blob storage quick start sample\n")
+	// see auth/SetEnvCreds function for more details
+	auth.SetEnvCreds()
+
 	// TODO: replace <storage-account-name> with your actual storage account name
 	url := viper.GetString("app.accounturl")
 
