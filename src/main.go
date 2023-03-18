@@ -3,17 +3,26 @@ package main
 import (
 	"context"
 	"fmt"
-	"utility"
+	"gowithazure/src/utility"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
+	"github.com/spf13/viper"
 )
 
 func main() {
-	fmt.Printf("Azure Blob storage quick start sample\n")
+	viper.SetConfigName("config")
+	viper.AddConfigPath("../")
+	viper.AutomaticEnv()
+	viper.SetConfigType("yml")
 
+	if err := viper.ReadInConfig(); err != nil {
+		fmt.Printf("Error reading config file, %s", err)
+	}
+
+	fmt.Printf("Azure Blob storage quick start sample\n")
 	// TODO: replace <storage-account-name> with your actual storage account name
-	url := "https://goteststorageaccount.blob.core.windows.net/"
+	url := viper.GetString("app.accounturl")
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	utility.HandleError(err)
