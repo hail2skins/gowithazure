@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gowithazure/src/auth"
+	"gowithazure/src/config"
 	"gowithazure/src/utility"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -12,17 +13,11 @@ import (
 )
 
 func main() {
-	viper.SetConfigName("config")
-	viper.AddConfigPath("../")
-	viper.AutomaticEnv()
-	viper.SetConfigType("yml")
-
-	if err := viper.ReadInConfig(); err != nil {
-		fmt.Printf("Error reading config file, %s", err)
-	}
+	// Passing in viper setup config to get rolling from comfig\ViperInit file
+	config.ViperInit()
 
 	fmt.Printf("Azure Blob storage quick start sample\n")
-	// see auth/SetEnvCreds function for more details
+	// see auth\azurelogin.go for function details
 	auth.SetEnvCreds()
 
 	// TODO: replace <storage-account-name> with your actual storage account name
@@ -46,7 +41,9 @@ func main() {
 		for _, container := range resp.ContainerItems {
 			fmt.Printf("Container Name: %s\n", *container.Name)
 		}
-		fmt.Println(len(resp.ContainerItems))
+		total := len(resp.ContainerItems)
+
+		fmt.Printf("There are %v containers in the storage account.", total)
 	}
 
 }
