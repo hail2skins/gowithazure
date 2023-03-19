@@ -21,7 +21,7 @@ func main() {
 	auth.SetEnvCreds()
 
 	// TODO: replace <storage-account-name> with your actual storage account name
-	url := viper.GetString("app.accounturl")
+	url := viper.GetString("app.accounturl1")
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	utility.HandleError(err)
