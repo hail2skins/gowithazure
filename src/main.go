@@ -23,6 +23,8 @@ func main() {
 	// TODO: replace <storage-account-name> with your actual storage account name
 	url := viper.GetString("app.accounturl1")
 
+	fmt.Printf("Evaluating storage account %s", url)
+
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	utility.HandleError(err)
 	ctx := context.Background()
@@ -38,9 +40,9 @@ func main() {
 	for pager.More() {
 		resp, err := pager.NextPage(ctx)
 		utility.HandleError(err) // if err is not nil, break the loop.
-		for _, container := range resp.ContainerItems {
-			fmt.Printf("Container Name: %s\n", *container.Name)
-		}
+		//for _, container := range resp.ContainerItems {
+		//fmt.Printf("Container Name: %s\n", *container.Name)
+		//}
 		total := len(resp.ContainerItems)
 
 		fmt.Printf("There are %v containers in the storage account.", total)

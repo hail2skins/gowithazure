@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"gowithazure/src/auth"
+	"gowithazure/src/config"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -10,10 +12,17 @@ import (
 )
 
 func main() {
+	// Passing in viper setup config to get rolling from comfig\ViperInit file
+	config.ViperInit()
+
+	fmt.Printf("Azure Blob storage quick start sample\n")
+	// see auth\azurelogin.go for function details
+	auth.SetEnvCreds()
+
 	// storageAccounts is a slice of strings containing the storage account URLs
 	var storageAccounts = []string{
-		viper.GetString("app.accounturl1"),
-		viper.GetString("app.accounturl2"),
+		viper.GetString("app.accounturldev"),
+		//viper.GetString("app.accounturl2"),
 	}
 
 	var totalContainerCount int
@@ -59,7 +68,7 @@ func main() {
 					totalBlobCount += len(page.Segment.BlobItems)
 				}
 
-				fmt.Printf("  Container: %s (%d blobs)\n", *container.Name, blobCount)
+				//fmt.Printf("  Container: %s (%d blobs)\n", *container.Name, blobCount)
 			}
 		}
 		fmt.Printf("  Container count: %d\n", containerCount)
