@@ -2,7 +2,7 @@
 // It is important to know the way the SDK works it only returns 5000 items at a time. So if you have more than 5000 containers
 // it takes a while.  The NewListContainersPager uses a marker interally. This is as fast as we get.
 
-package main
+package storage
 
 import (
 	"context"
