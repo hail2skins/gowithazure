@@ -3,67 +3,54 @@ package main
 import (
 	"context"
 	"fmt"
-	"gowithazure/src/config"
-	"gowithazure/src/utility"
-	"sync"
+	"log"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/spf13/viper"
 )
 
 func main() {
-	config.ViperInit()
-	//auth.SetEnvCreds()
-	url := viper.GetString("app.accounturlusprod")
+	srcAccountURL := "https://goteststorageaccount.blob.core.windows.net/"
+	dstAccountURL := "https://goteststoragesecondary.blob.core.windows.net/"
+	srcContainerName := "nutty"
+	dstContainerName := "nutty"
+	blobName := "Proof_of_Insurance.pdf"
 
-	fmt.Printf("Azure Storage Account Container Count\n")
-	fmt.Printf("Evaluating storage account %s\n", url)
+	ctx := context.Background()
 
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
-	utility.HandleError(err)
-	ctx := context.Background()
-	client, err := azblob.NewClient(url, credential, nil)
-	utility.HandleError(err)
-
-	pager := client.NewListContainersPager(&azblob.ListContainersOptions{
-		Include: azblob.ListContainersInclude{Metadata: true, Deleted: true},
-	})
-
-	containerNames := make(map[string]bool)
-	containerChan := make(chan []string)
-	var wg sync.WaitGroup
-
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for pager.More() {
-				resp, err := pager.NextPage(ctx)
-				if err != nil {
-					break
-				}
-				var containerItems []string
-				for _, containerItem := range resp.ContainerItems {
-					containerItems = append(containerItems, *containerItem.Name)
-				}
-				containerChan <- containerItems
-			}
-		}()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	go func() {
-		wg.Wait()
-		close(containerChan)
-	}()
-
-	for containerItems := range containerChan {
-		for _, name := range containerItems {
-			if !containerNames[name] {
-				containerNames[name] = true
-			}
-		}
+	srcClient, err := azblob.NewClient(srcAccountURL, credential, nil)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	fmt.Printf("There are %v containers in the storage account.\n", len(containerNames))
+	dstClient, err := azblob.NewClient(dstAccountURL, credential, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	srcContainerClient := srcClient.ServiceClient().NewContainerClient(srcContainerName)
+	dstContainerClient := dstClient.ServiceClient().NewContainerClient(dstContainerName)
+
+	createResp, err := dstContainerClient.Create(ctx, nil)
+	if err != nil {
+		log.Printf("Failed to create container, it might already exist: %v", err)
+	} else {
+		log.Printf("Container created successfully, ETag: %s", *createResp.ETag)
+	}
+
+	srcBlobClient := srcContainerClient.NewBlobClient(blobName)
+	dstBlobClient := dstContainerClient.NewBlobClient(blobName)
+
+	copySource := srcBlobClient.URL()
+	resp, err := dstBlobClient.StartCopyFromURL(ctx, copySource, nil)
+	if err != nil {
+		log.Fatalf("Failed to copy blob: %v", err)
+	}
+
+	fmt.Printf("Blob copy started, copy ID: %s\n", *resp.CopyID)
 }
