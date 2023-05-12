@@ -1,4 +1,6 @@
-package storage
+// listcontainers.go - List containers in a storage account.
+// do not run this on a storage account with a ton of containers as the list will be long
+package main
 
 import (
 	"context"
@@ -32,7 +34,7 @@ func main() {
 
 	//Get a list of containers
 	pager := client.NewListContainersPager(&azblob.ListContainersOptions{
-		Include: azblob.ListContainersInclude{Metadata: true, Deleted: true},
+		Include: azblob.ListContainersInclude{Metadata: true, Deleted: false}, // Include metadata and exclude deleted containers
 	})
 
 	for pager.More() {
@@ -40,6 +42,7 @@ func main() {
 		utility.HandleError(err) // if err is not nil, break the loop.
 		for _, container := range resp.ContainerItems {
 			fmt.Printf("Container Name: %s\n", *container.Name)
+			fmt.Printf("Container: %v\n", container.Properties.LastModified)
 		}
 		total := len(resp.ContainerItems)
 
