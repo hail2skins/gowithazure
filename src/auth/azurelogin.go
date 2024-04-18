@@ -16,4 +16,9 @@ func SetEnvCreds() {
 	os.Setenv("AZURE_CLIENT_ID", viper.GetString("app.AZURE_CLIENT_ID"))
 	os.Setenv("AZURE_CLIENT_SECRET", viper.GetString("app.AZURE_CLIENT_SECRET"))
 	fmt.Println("Setting environment variables")
+
+	// // Additional print statements to verify the environment variables
+	// fmt.Println("AZURE_TENANT_ID:", os.Getenv("AZURE_TENANT_ID"))
+	// fmt.Println("AZURE_CLIENT_ID:", os.Getenv("AZURE_CLIENT_ID"))
+	// fmt.Println("AZURE_CLIENT_SECRET:", os.Getenv("AZURE_CLIENT_SECRET"))
 }

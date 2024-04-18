@@ -1,14 +1,13 @@
-// Description: Just list the containers in the storage account. This can engage a list of accounts
-// It is important to know the way the SDK works it only returns 5000 items at a time. So if you have more than 5000 containers
-// it takes a while.  The NewListContainersPager uses a marker interally. This is as fast as we get.
 package main
 
 import (
 	"context"
 	"fmt"
+	"sync"
+	"time"
+
 	"gowithazure/src/auth"
 	"gowithazure/src/config"
-	"gowithazure/src/utility"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
@@ -16,52 +15,86 @@ import (
 )
 
 func main() {
-	// Initialize the configuration file and get the viper object
+	start := time.Now()
+
+	// Initialize configuration and set environment variables for Azure authentication
 	config.ViperInit()
-	// see auth\azurelogin.go for function details. if using az login you can comment this out
 	auth.SetEnvCreds()
-	// config.yml has this and several other storage account urls to test with
-	// Define a slice of strings containing the storage account urls to test with
+
+	// Retrieve storage account URLs from configuration
 	urls := []string{
-		viper.GetString("app.accounturl1"),
 		viper.GetString("app.accounturl2"),
-		//viper.GetString("app.accounturl3"),
-		// add more urls here as needed
+		viper.GetString("app.accounturl2"),
+		// Add more URLs as needed
 	}
 
-	// Iterate over the urls slice with a for loop
-	for i, url := range urls {
-		fmt.Printf("Azure Storage Account Container Count for %s\n", url)
+	// Initialize a wait group to synchronize goroutines
+	var wg sync.WaitGroup
+	// Create a channel to communicate counts from goroutines
+	countChannel := make(chan int)
 
-		// Create a default credential object.  This will use the environment variables. Or variables from az login if you are using that.
-		credential, err := azidentity.NewDefaultAzureCredential(nil)
-		// Handle any errors that might have occurred
-		utility.HandleError(err)
-		// Create a context object
-		ctx := context.Background()
-		// Create a client object
-		client, err := azblob.NewClient(url, credential, nil)
-		utility.HandleError(err)
-		// Get a list of containers
-		pager := client.NewListContainersPager(&azblob.ListContainersOptions{
-			Include: azblob.ListContainersInclude{Metadata: true, Deleted: false}, // Include metadata and exclude deleted containers
-		})
-
-		var totalContainers int
-		// Loop through the pages of containers
-		for pager.More() {
-			resp, err := pager.NextPage(ctx)
-			if err != nil {
-				break
-			}
-			totalContainers += len(resp.ContainerItems)
-		}
-
-		fmt.Printf("There are %v containers in the storage account.\n", totalContainers)
-
-		// Print a separator between each url's output
-		if i < len(urls)-1 {
-			fmt.Println("--------------------------------------------------")
-		}
+	for _, url := range urls {
+		// Increment the wait group counter for each URL
+		wg.Add(1)
+		// Launch a goroutine for each URL
+		go func(url string) {
+			defer wg.Done() // Decrement the wait group counter when the goroutine completes
+			count := processURL(url)
+			countChannel <- count // Send the count to the channel
+		}(url)
 	}
+
+	// Launch a goroutine to close the countChannel once all processing goroutines are done
+	go func() {
+		wg.Wait()           // Wait for all goroutines to finish
+		close(countChannel) // Close the channel to signal completion
+	}()
+
+	// Aggregate counts from the channel
+	totalContainers := 0
+	for count := range countChannel {
+		totalContainers += count
+	}
+
+	// Output the total count and the time taken for processing
+	fmt.Printf("Total containers across all accounts: %v\n", totalContainers)
+	fmt.Printf("Total time taken: %v\n", time.Since(start))
+}
+
+// processURL takes a storage account URL and returns the count of containers
+func processURL(url string) int {
+	// Create a default Azure credential object
+	credential, err := azidentity.NewDefaultAzureCredential(nil)
+	if err != nil {
+		fmt.Printf("Error creating credential: %v\n", err)
+		return 0 // Return 0 if there's an error creating the credential
+	}
+
+	// Create a context for the Azure SDK operations
+	ctx := context.Background()
+
+	// Create a client for the storage account
+	client, err := azblob.NewClient(url, credential, nil)
+	if err != nil {
+		fmt.Printf("Error creating client for URL %s: %v\n", url, err)
+		return 0 // Return 0 if there's an error creating the client
+	}
+
+	// Initialize the pager for listing containers
+	pager := client.NewListContainersPager(&azblob.ListContainersOptions{
+		Include: azblob.ListContainersInclude{Metadata: true, Deleted: false},
+	})
+
+	// Count the containers
+	containerCount := 0
+	for pager.More() {
+		resp, err := pager.NextPage(ctx)
+		if err != nil {
+			fmt.Printf("Error getting next page for URL %s: %v\n", url, err)
+			break // Exit the loop if there's an error getting the next page
+		}
+		containerCount += len(resp.ContainerItems)
+	}
+
+	return containerCount
 }
