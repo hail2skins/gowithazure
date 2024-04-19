@@ -24,14 +24,14 @@ func main() {
 	// Retrieve storage account URLs from configuration
 	urls := []string{
 		viper.GetString("app.accounturl2"),
-		viper.GetString("app.accounturl2"),
+		//viper.GetString("app.accounturl1"),
 		// Add more URLs as needed
 	}
 
 	// Initialize a wait group to synchronize goroutines
 	var wg sync.WaitGroup
 	// Create a channel to communicate counts from goroutines
-	countChannel := make(chan int)
+	countChannel := make(chan [2]int)
 
 	for _, url := range urls {
 		// Increment the wait group counter for each URL
@@ -39,8 +39,8 @@ func main() {
 		// Launch a goroutine for each URL
 		go func(url string) {
 			defer wg.Done() // Decrement the wait group counter when the goroutine completes
-			count := processURL(url)
-			countChannel <- count // Send the count to the channel
+			total, empty := processURL(url)
+			countChannel <- [2]int{total, empty} // Send the count to the channel
 		}(url)
 	}
 
@@ -52,22 +52,26 @@ func main() {
 
 	// Aggregate counts from the channel
 	totalContainers := 0
+	totalEmptyContainers := 0
+
 	for count := range countChannel {
-		totalContainers += count
+		totalContainers += count[0]
+		totalEmptyContainers += count[1]
 	}
 
 	// Output the total count and the time taken for processing
 	fmt.Printf("Total containers across all accounts: %v\n", totalContainers)
+	fmt.Printf("Total empty containers across all accounts: %v\n", totalEmptyContainers)
 	fmt.Printf("Total time taken: %v\n", time.Since(start))
 }
 
 // processURL takes a storage account URL and returns the count of containers
-func processURL(url string) int {
+func processURL(url string) (int, int) {
 	// Create a default Azure credential object
 	credential, err := azidentity.NewDefaultAzureCredential(nil)
 	if err != nil {
 		fmt.Printf("Error creating credential: %v\n", err)
-		return 0 // Return 0 if there's an error creating the credential
+		return 0, 0 // Return 0s if there's an error creating the credential
 	}
 
 	// Create a context for the Azure SDK operations
@@ -77,7 +81,7 @@ func processURL(url string) int {
 	client, err := azblob.NewClient(url, credential, nil)
 	if err != nil {
 		fmt.Printf("Error creating client for URL %s: %v\n", url, err)
-		return 0 // Return 0 if there's an error creating the client
+		return 0, 0 // Return 0s if there's an error creating the client
 	}
 
 	// Initialize the pager for listing containers
@@ -85,8 +89,9 @@ func processURL(url string) int {
 		Include: azblob.ListContainersInclude{Metadata: true, Deleted: false},
 	})
 
-	// Count the containers
+	// Count the containers and empty containers
 	containerCount := 0
+	emptyContainerCount := 0
 	for pager.More() {
 		resp, err := pager.NextPage(ctx)
 		if err != nil {
@@ -94,7 +99,28 @@ func processURL(url string) int {
 			break // Exit the loop if there's an error getting the next page
 		}
 		containerCount += len(resp.ContainerItems)
+
+		// Check each container for blobs
+		for _, containerItem := range resp.ContainerItems {
+			maxResults := int32(1) // Request only one blob to minimize data retrieval
+			blobPager := client.NewListBlobsFlatPager(*containerItem.Name, &azblob.ListBlobsFlatOptions{
+				Include:    azblob.ListBlobsInclude{Deleted: false},
+				MaxResults: &maxResults,
+			})
+
+			// Fetch the first page of the blob listing
+			blobResp, err := blobPager.NextPage(ctx)
+			if err != nil {
+				fmt.Printf("Error checking blobs in container %s: %v\n", *containerItem.Name, err)
+				continue // Skip to next container on error
+			}
+
+			// Check if the page has any blobs
+			if len(blobResp.Segment.BlobItems) == 0 {
+				emptyContainerCount++
+			}
+		}
 	}
 
-	return containerCount
+	return containerCount, emptyContainerCount
 }
